@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MikroTik Junior Engineer Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&family=Playfair+Display:ital,wght@1,600&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0fdfa;
+            color: #1e293b;
+            user-select: none;
+        }
+
+        /* Certificate Styles */
+        .certificate {
+            font-family: 'Playfair Display', serif;
+            border: 12px solid #0f172a;
+            outline: 4px solid #38bdf8;
+            outline-offset: -16px;
+            background-image: repeating-linear-gradient(45deg, #f8fafc 25%, transparent 25%, transparent 75%, #f8fafc 75%, #f8fafc), repeating-linear-gradient(45deg, #f8fafc 25%, #ffffff 25%, #ffffff 75%, #f8fafc 75%, #f8fafc);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+        }
+
+        /* Drag & Drop Styles */
+        .draggable {
+            cursor: grab;
+            transition: transform 0.2s;
+        }
+        .draggable:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+        .dropzone {
+            transition: all 0.3s;
+            border: 2px dashed #94a3b8;
+        }
+        .dropzone.dragover {
+            background-color: #e0f2fe;
+            border-color: #0284c7;
+            transform: scale(1.02);
+        }
+        .dropped-correct {
+            background-color: #dcfce7 !important;
+            border-color: #22c55e !important;
+            border-style: solid !important;
+            pointer-events: none;
+        }
+
+        /* Matching Word Styles */
+        .match-btn {
+            transition: all 0.2s;
+        }
+        .match-btn.selected {
+            background-color: #bae6fd;
+            border-color: #0284c7;
+            transform: scale(1.05);
+        }
+        .match-btn.correct {
+            background-color: #dcfce7;
+            border-color: #22c55e;
+            color: #166534;
+            pointer-events: none;
+        }
+        .match-btn.wrong {
+            background-color: #fee2e2;
+            border-color: #ef4444;
+            animation: shake 0.4s;
+        }
+
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Audio Control Floating Button */
+        #audio-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Audio Elements -->
+    <audio id="bg-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sfx-correct">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="sfx-wrong">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Floating Audio Control -->
+    <div id="audio-control" class="flex gap-2">
+        <button onclick="toggleMusic()" id="music-toggle-btn" class="bg-white p-3 rounded-full shadow-lg border-2 border-slate-200 hover:bg-slate-50 transition text-slate-600">
+            <i class="fa-solid fa-volume-xmark" id="music-icon"></i>
+        </button>
+    </div>
+
+    <div id="game-container" class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        
+        <!-- Header -->
+        <header class="bg-slate-800 text-white p-4 flex justify-between items-center z-10 relative shadow-md">
+            <div class="font-bold text-xl flex items-center gap-2">
+                <i class="fa-solid fa-network-wired text-sky-400"></i>
+                MikroTik Academy
+            </div>
+            <div id="score-display" class="hidden font-semibold bg-sky-500 px-4 py-1 rounded-full text-sm">
+                Skor: <span id="current-score">0</span>
+            </div>
+        </header>
+
+        <!-- Screen: Welcome -->
+        <div id="screen-welcome" class="screen active p-8 md:p-12 text-center">
+            <i class="fa-solid fa-server text-6xl text-sky-500 mb-6"></i>
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-800 mb-4">Ujian Junior Network Engineer</h1>
+            <p class="text-slate-600 mb-8 max-w-lg mx-auto">Selesaikan 3 misi konfigurasi dan troubleshooting jaringan MikroTik untuk mendapatkan sertifikat kelulusan Anda.</p>
+            
+            <div class="max-w-sm mx-auto">
+                <input type="text" id="player-name" placeholder="Masukkan Nama Lengkap Anda" class="w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:border-sky-500 focus:outline-none text-center mb-4 text-lg">
+                <button onclick="startGame()" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:-translate-y-1 shadow-lg flex justify-center items-center gap-2">
+                    Mulai Ujian <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <p id="name-error" class="text-red-500 text-sm mt-2 hidden">Nama tidak boleh kosong!</p>
+            </div>
+        </div>
+
+        <!-- Screen: Level 1 (Drag & Drop) -->
+        <div id="screen-lvl1" class="screen p-6 md:p-8">
+            <div class="mb-6 flex justify-between items-end border-b pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Level 1: Hardware Setup</h2>
+                    <p class="text-slate-600 text-sm">Drag & Drop kabel ke port yang benar di RouterBoard.</p>
+                </div>
+                <div class="bg-slate-100 text-slate-500 px-3 py-1 rounded text-sm font-semibold">1 / 3</div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Draggables -->
+                <div class="w-full md:w-1/3 flex flex-col gap-4" id="draggable-container">
+                    <div class="draggable bg-white border-2 border-slate-200 rounded-lg p-4 shadow flex items-center gap-3" draggable="true" data-item="isp" id="drag-isp">
+                        <i class="fa-solid fa-globe text-2xl text-blue-500"></i>
+                        <div>
+                            <p class="font-bold text-sm">Kabel Internet (ISP)</p>
+                            <p class="text-xs text-slate-500">Sumber Internet</p>
+                        </div>
+                    </div>
+                    <div class="draggable bg-white border-2 border-slate-200 rounded-lg p-4 shadow flex items-center gap-3" draggable="true" data-item="lan" id="drag-lan">
+                        <i class="fa-solid fa-laptop text-2xl text-green-500"></i>
+                        <div>
+                            <p class="font-bold text-sm">Kabel LAN</p>
+                            <p class="text-xs text-slate-500">Ke Komputer Klien</p>
+                        </div>
+                    </div>
+                    <div class="draggable bg-white border-2 border-slate-200 rounded-lg p-4 shadow flex items-center gap-3" draggable="true" data-item="power" id="drag-power">
+                        <i class="fa-solid fa-plug text-2xl text-yellow-500"></i>
+                        <div>
+                            <p class="font-bold text-sm">Adaptor Power</p>
+                            <p class="text-xs text-slate-500">Listrik DC 12V</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dropzones (Router Simulation) -->
+                <div class="w-full md:w-2/3 bg-slate-800 rounded-xl p-6 relative">
+                    <h3 class="text-white text-center font-bold mb-6 tracking-widest">MIKROTIK RB951</h3>
+                    <div class="flex flex-col md:flex-row justify-center items-center gap-6">
+                        
+                        <div class="flex flex-col items-center">
+                            <div class="dropzone w-24 h-24 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-slate-400 mb-2" data-target="power">
+                                <i class="fa-solid fa-circle-dot text-xl mb-1"></i>
+                                <span class="text-xs">DC Jack</span>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4 border-l-2 border-slate-600 pl-6">
+                            <div class="flex flex-col items-center">
+                                <div class="dropzone w-20 h-24 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-slate-400 mb-2" data-target="isp">
+                                    <i class="fa-solid fa-ethernet text-2xl mb-1"></i>
+                                </div>
+                                <span class="text-xs text-white font-mono">ether1</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="dropzone w-20 h-24 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-slate-400 mb-2" data-target="lan">
+                                    <i class="fa-solid fa-ethernet text-2xl mb-1"></i>
+                                </div>
+                                <span class="text-xs text-white font-mono">ether2</span>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-center text-sky-300 text-xs mt-8"><i class="fa-solid fa-info-circle"></i> Tips: Drag item di sebelah kiri dan Drop ke kotak yang tepat. (Bisa juga Tap item, lalu Tap kotak).</p>
+                </div>
+            </div>
+
+            <div class="mt-8 text-right hidden" id="btn-next-1">
+                <button onclick="nextLevel(2)" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition">
+                    Lanjut Level 2 <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Screen: Level 2 (Matching Word) -->
+        <div id="screen-lvl2" class="screen p-6 md:p-8">
+            <div class="mb-6 flex justify-between items-end border-b pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Level 2: Terminologi Sistem</h2>
+                    <p class="text-slate-600 text-sm">Pasangkan istilah MikroTik dengan fungsinya yang benar.</p>
+                </div>
+                <div class="bg-slate-100 text-slate-500 px-3 py-1 rounded text-sm font-semibold">2 / 3</div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-8 justify-between relative">
+                <div class="w-full md:w-5/12 flex flex-col gap-3" id="match-terms">
+                    <button class="match-btn match-term border-2 border-slate-200 bg-white p-4 rounded-lg text-left font-bold text-slate-700 hover:border-sky-400" data-id="1">1. Winbox</button>
+                    <button class="match-btn match-term border-2 border-slate-200 bg-white p-4 rounded-lg text-left font-bold text-slate-700 hover:border-sky-400" data-id="2">2. DHCP Server</button>
+                    <button class="match-btn match-term border-2 border-slate-200 bg-white p-4 rounded-lg text-left font-bold text-slate-700 hover:border-sky-400" data-id="3">3. Firewall NAT</button>
+                    <button class="match-btn match-term border-2 border-slate-200 bg-white p-4 rounded-lg text-left font-bold text-slate-700 hover:border-sky-400" data-id="4">4. Bridge</button>
+                </div>
+
+                <div class="w-full md:w-6/12 flex flex-col gap-3" id="match-defs">
+                    <button class="match-btn match-def border-2 border-slate-200 bg-white p-4 rounded-lg text-sm text-slate-600 hover:border-sky-400" data-id="4">A. Menggabungkan dua atau lebih interface menjadi satu segmen.</button>
+                    <button class="match-btn match-def border-2 border-slate-200 bg-white p-4 rounded-lg text-sm text-slate-600 hover:border-sky-400" data-id="2">B. Memberikan IP Address secara otomatis ke klien/komputer.</button>
+                    <button class="match-btn match-def border-2 border-slate-200 bg-white p-4 rounded-lg text-sm text-slate-600 hover:border-sky-400" data-id="1">C. Aplikasi GUI (Graphical User Interface) untuk konfigurasi MikroTik.</button>
+                    <button class="match-btn match-def border-2 border-slate-200 bg-white p-4 rounded-lg text-sm text-slate-600 hover:border-sky-400" data-id="3">D. Menerjemahkan IP lokal agar bisa mengakses internet (masquerade).</button>
+                </div>
+            </div>
+
+            <div class="mt-8 text-right hidden" id="btn-next-2">
+                <button onclick="nextLevel(3)" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded-lg transition">
+                    Lanjut Level 3 <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Screen: Level 3 (Multiple Choice) -->
+        <div id="screen-lvl3" class="screen p-6 md:p-8">
+            <div class="mb-6 flex justify-between items-end border-b pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Level 3: Troubleshooting & Logic</h2>
+                    <p class="text-slate-600 text-sm">Pilih jawaban yang paling tepat untuk masalah berikut.</p>
+                </div>
+                <div class="bg-slate-100 text-slate-500 px-3 py-1 rounded text-sm font-semibold">3 / 3</div>
+            </div>
+
+            <div class="space-y-6" id="quiz-container">
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                    <p class="font-bold text-slate-800 mb-3">1. Berapa IP address default dari router MikroTik saat baru di-reset konfigurasi?</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q1" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> A. 192.168.1.1
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q1" value="correct" class="mr-3 w-4 h-4 text-sky-600"> B. 192.168.88.1
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q1" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> C. 10.10.10.1
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                    <p class="font-bold text-slate-800 mb-3">2. Jika Anda ingin membatasi kecepatan download/upload pelanggan, menu utama apa yang digunakan?</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q2" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> A. IP > Routes
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q2" value="correct" class="mr-3 w-4 h-4 text-sky-600"> B. Queues
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q2" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> C. System > Identity
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-5 rounded-lg border border-slate-200">
+                    <p class="font-bold text-slate-800 mb-3">3. Apa fungsi utama dari tombol "Safe Mode" saat mengkonfigurasi via Winbox?</p>
+                    <div class="space-y-2">
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q3" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> A. Mencegah router dari serangan virus.
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q3" value="wrong" class="mr-3 w-4 h-4 text-sky-600"> B. Mengamankan password admin.
+                        </label>
+                        <label class="flex items-center p-3 bg-white border rounded cursor-pointer hover:bg-slate-100 transition">
+                            <input type="radio" name="q3" value="correct" class="mr-3 w-4 h-4 text-sky-600"> C. Membatalkan konfigurasi terakhir secara otomatis jika koneksi terputus.
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center text-red-500 text-sm hidden" id="quiz-error">
+                Harap jawab semua pertanyaan terlebih dahulu!
+            </div>
+
+            <div class="mt-8 text-right">
+                <button onclick="submitQuiz()" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-3 px-8 rounded-lg transition shadow-lg w-full md:w-auto">
+                    Selesaikan Ujian & Lihat Hasil <i class="fa-solid fa-flag-checkered"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Screen: Result & Certificate -->
+        <div id="screen-result" class="screen p-4 md:p-8 bg-slate-50">
+            <div id="certificate-wrapper" class="certificate bg-white p-8 md:p-12 text-center relative max-w-3xl mx-auto shadow-sm">
+                
+                <div class="absolute top-8 left-8 text-sky-200 text-8xl opacity-30">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+                <div class="absolute bottom-8 right-8 text-sky-200 text-8xl opacity-30">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+
+                <div class="relative z-10">
+                    <h4 class="text-sky-600 font-bold tracking-widest text-sm uppercase mb-2">Certificate of Achievement</h4>
+                    <h1 class="text-4xl md:text-5xl font-bold text-slate-800 mb-8 pb-4 border-b-2 border-slate-200 italic">MikroTik Junior Technician</h1>
+                    
+                    <p class="text-slate-600 mb-2">Sertifikat ini diberikan kepada:</p>
+                    <h2 id="cert-name" class="text-3xl font-bold text-sky-600 mb-6 font-sans">NAMA PLAYER</h2>
+                    
+                    <p class="text-slate-600 max-w-md mx-auto mb-8">
+                        Telah berhasil menyelesaikan simulasi ujian dengan sangat baik dan membuktikan pemahaman dasar tentang perangkat, terminologi, dan troubleshooting MikroTik.
+                    </p>
+
+                    <div class="flex justify-center items-center gap-8 border-t-2 border-slate-200 pt-6">
+                        <div>
+                            <p class="text-slate-500 text-xs uppercase tracking-wider">Skor Akhir</p>
+                            <p id="cert-score" class="text-3xl font-bold text-slate-800 font-sans">100/100</p>
+                        </div>
+                        <div class="w-px h-12 bg-slate-300"></div>
+                        <div>
+                            <p class="text-slate-500 text-xs uppercase tracking-wider">Status</p>
+                            <p id="cert-status" class="text-xl font-bold text-green-600 font-sans">LULUS</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-center gap-4 no-print">
+                <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-6 rounded-lg transition shadow flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i> Cetak Sertifikat
+                </button>
+                <button onclick="location.reload()" class="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold py-2 px-6 rounded-lg transition shadow flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> Main Lagi
+                </button>
+            </div>
+            <style>
+                @media print {
+                    body { background: white; padding: 0; }
+                    #game-container { box-shadow: none; max-width: 100%; border: none; }
+                    header, .no-print, #audio-control { display: none !important; }
+                    .certificate { outline: none; border-width: 8px; margin: 0; }
+                }
+            </style>
+        </div>
+
+    </div>
+
+    <script>
+        // Global Game State
+        let gameState = {
+            playerName: "",
+            score: 0,
+            level1Done: 0,
+            level2Done: 0,
+            musicPlaying: false
+        };
+
+        // Audio Elements
+        const bgMusic = document.getElementById('bg-music');
+        const sfxCorrect = document.getElementById('sfx-correct');
+        const sfxWrong = document.getElementById('sfx-wrong');
+        const musicIcon = document.getElementById('music-icon');
+
+        // Audio Logic
+        function toggleMusic() {
+            if (gameState.musicPlaying) {
+                bgMusic.pause();
+                musicIcon.className = "fa-solid fa-volume-xmark";
+            } else {
+                bgMusic.play().catch(e => console.log("Audio play blocked by browser"));
+                musicIcon.className = "fa-solid fa-volume-high";
+            }
+            gameState.musicPlaying = !gameState.musicPlaying;
+        }
+
+        function playCorrect() {
+            sfxCorrect.currentTime = 0;
+            sfxCorrect.play();
+        }
+
+        function playWrong() {
+            sfxWrong.currentTime = 0;
+            sfxWrong.play();
+        }
+
+        // Utility: Update Score Display
+        function addScore(points) {
+            gameState.score += points;
+            document.getElementById('current-score').innerText = gameState.score;
+        }
+
+        // Screen Navigation
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if(screenId !== 'screen-welcome' && screenId !== 'screen-result') {
+                document.getElementById('score-display').classList.remove('hidden');
+            } else {
+                document.getElementById('score-display').classList.add('hidden');
+            }
+        }
+
+        function startGame() {
+            const nameInput = document.getElementById('player-name').value.trim();
+            if(!nameInput) {
+                document.getElementById('name-error').classList.remove('hidden');
+                return;
+            }
+            gameState.playerName = nameInput;
+            document.getElementById('name-error').classList.add('hidden');
+            
+            // Start music on first interaction
+            if (!gameState.musicPlaying) toggleMusic();
+            
+            showScreen('screen-lvl1');
+            initLevel1();
+        }
+
+        function nextLevel(levelNum) {
+            showScreen('screen-lvl' + levelNum);
+            if(levelNum === 2) initLevel2();
+            if(levelNum === 3) initLevel3();
+        }
+
+        // ================= LEVEL 1: DRAG & DROP =================
+        function initLevel1() {
+            const draggables = document.querySelectorAll('.draggable');
+            const dropzones = document.querySelectorAll('.dropzone');
+            let draggedItem = null;
+            let tapSelected = null;
+
+            draggables.forEach(elem => {
+                elem.addEventListener('dragstart', (e) => {
+                    draggedItem = elem;
+                    setTimeout(() => elem.classList.add('opacity-50'), 0);
+                });
+                elem.addEventListener('dragend', () => {
+                    setTimeout(() => elem.classList.remove('opacity-50'), 0);
+                    draggedItem = null;
+                });
+                elem.addEventListener('click', () => {
+                    if(elem.classList.contains('hidden')) return;
+                    draggables.forEach(d => d.classList.remove('ring-4', 'ring-sky-400'));
+                    elem.classList.add('ring-4', 'ring-sky-400');
+                    tapSelected = elem;
+                });
+            });
+
+            dropzones.forEach(zone => {
+                zone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if(!zone.classList.contains('dropped-correct')) {
+                        zone.classList.add('dragover');
+                    }
+                });
+                zone.addEventListener('dragleave', () => {
+                    zone.classList.remove('dragover');
+                });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    zone.classList.remove('dragover');
+                    if(draggedItem) checkDrop(draggedItem, zone);
+                });
+                zone.addEventListener('click', () => {
+                    if(tapSelected && !zone.classList.contains('dropped-correct')) {
+                        checkDrop(tapSelected, zone);
+                        tapSelected.classList.remove('ring-4', 'ring-sky-400');
+                        tapSelected = null;
+                    }
+                });
+            });
+        }
+
+        function checkDrop(item, zone) {
+            const itemId = item.getAttribute('data-item');
+            const targetId = zone.getAttribute('data-target');
+
+            if(itemId === targetId) {
+                playCorrect();
+                zone.innerHTML = item.innerHTML;
+                zone.classList.add('dropped-correct');
+                item.classList.add('hidden');
+                addScore(10);
+                
+                gameState.level1Done++;
+                if(gameState.level1Done === 3) {
+                    document.getElementById('btn-next-1').classList.remove('hidden');
+                }
+            } else {
+                playWrong();
+                zone.classList.add('bg-red-100', 'border-red-500');
+                setTimeout(() => {
+                    zone.classList.remove('bg-red-100', 'border-red-500');
+                }, 500);
+            }
+        }
+
+        // ================= LEVEL 2: MATCHING WORD =================
+        function initLevel2() {
+            let selectedTerm = null;
+            let selectedDef = null;
+
+            const terms = document.querySelectorAll('.match-term');
+            const defs = document.querySelectorAll('.match-def');
+
+            function checkMatch() {
+                if(selectedTerm && selectedDef) {
+                    const termId = selectedTerm.getAttribute('data-id');
+                    const defId = selectedDef.getAttribute('data-id');
+
+                    if(termId === defId) {
+                        playCorrect();
+                        selectedTerm.classList.remove('selected');
+                        selectedDef.classList.remove('selected');
+                        selectedTerm.classList.add('correct');
+                        selectedDef.classList.add('correct');
+                        
+                        addScore(10);
+                        gameState.level2Done++;
+                        
+                        if(gameState.level2Done === 4) {
+                            document.getElementById('btn-next-2').classList.remove('hidden');
+                        }
+                    } else {
+                        playWrong();
+                        selectedTerm.classList.remove('selected');
+                        selectedDef.classList.remove('selected');
+                        selectedTerm.classList.add('wrong');
+                        selectedDef.classList.add('wrong');
+                        
+                        setTimeout(() => {
+                            selectedTerm.classList.remove('wrong');
+                            selectedDef.classList.remove('wrong');
+                        }, 500);
+                    }
+                    selectedTerm = null;
+                    selectedDef = null;
+                }
+            }
+
+            terms.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if(btn.classList.contains('correct')) return;
+                    terms.forEach(t => { if(!t.classList.contains('correct')) t.classList.remove('selected'); });
+                    btn.classList.add('selected');
+                    selectedTerm = btn;
+                    checkMatch();
+                });
+            });
+
+            defs.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if(btn.classList.contains('correct')) return;
+                    defs.forEach(d => { if(!d.classList.contains('correct')) d.classList.remove('selected'); });
+                    btn.classList.add('selected');
+                    selectedDef = btn;
+                    checkMatch();
+                });
+            });
+        }
+
+        // ================= LEVEL 3: MULTIPLE CHOICE =================
+        function initLevel3() {}
+
+        function submitQuiz() {
+            const q1 = document.querySelector('input[name="q1"]:checked');
+            const q2 = document.querySelector('input[name="q2"]:checked');
+            const q3 = document.querySelector('input[name="q3"]:checked');
+
+            if(!q1 || !q2 || !q3) {
+                document.getElementById('quiz-error').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('quiz-error').classList.add('hidden');
+
+            let quizScore = 0;
+            if(q1.value === 'correct') { quizScore += 10; playCorrect(); } else { playWrong(); }
+            if(q2.value === 'correct') { quizScore += 10; playCorrect(); } else { playWrong(); }
+            if(q3.value === 'correct') { quizScore += 10; playCorrect(); } else { playWrong(); }
+
+            addScore(quizScore);
+            generateCertificate();
+        }
+
+        // ================= CERTIFICATE =================
+        function generateCertificate() {
+            showScreen('screen-result');
+            document.getElementById('cert-name').innerText = gameState.playerName.toUpperCase();
+            document.getElementById('cert-score').innerText = `${gameState.score}/100`;
+
+            const statusElem = document.getElementById('cert-status');
+            if(gameState.score >= 70) {
+                statusElem.innerText = "LULUS";
+                statusElem.className = "text-xl font-bold text-green-600 font-sans";
+            } else {
+                statusElem.innerText = "TIDAK LULUS";
+                statusElem.className = "text-xl font-bold text-red-600 font-sans";
+            }
+        }
+    </script>
+</body>
+</html>
